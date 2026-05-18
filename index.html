@@ -246,6 +246,42 @@
   .debug .miss { color: #FD605D; }
 
   input[type="file"] { display: none; }
+
+  /* ── Crop modal ── */
+  .crop-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    place-items: center;
+  }
+  .crop-modal.visible { display: grid; }
+
+  .crop-box {
+    background: #1a1a2e;
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+  .crop-box h3 { font-size: 15px; font-weight: 700; color: #fff; margin: 0; }
+  .crop-box p  { font-size: 11px; color: #666; margin: 0; }
+
+  #crop-canvas {
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    cursor: grab;
+    display: block;
+  }
+  #crop-canvas:active { cursor: grabbing; }
+
+  .crop-actions { display: flex; gap: 10px; width: 100%; }
+  .crop-actions .btn { flex: 1; }
 </style>
 </head>
 <body>
@@ -315,6 +351,18 @@
   </div>
 </div>
 
+<div class="crop-modal" id="crop-modal">
+  <div class="crop-box">
+    <h3>Adjust Photo</h3>
+    <canvas id="crop-canvas" width="280" height="280"></canvas>
+    <p>Drag to reposition &middot; Scroll to zoom</p>
+    <div class="crop-actions">
+      <button class="btn btn-apply" id="btn-crop-cancel">Cancel</button>
+      <button class="btn btn-render" id="btn-crop-apply">Apply</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/@rive-app/canvas@2"></script>
 <script>
 (function () {
@@ -343,6 +391,7 @@
   let uploadedImageBytes = null;
   let recordedBlob = null;
   let imageAssetNames = [];
+  let profileImageAsset = null;
 
   // ViewModel property handles
   let vmProps = {};
@@ -351,6 +400,111 @@
     statusEl.className = 'status ' + (cls || '');
     statusEl.innerHTML = text;
   }
+
+  // ── Crop editor ──
+  var cropCanvas   = document.getElementById('crop-canvas');
+  var cropCtx      = cropCanvas.getContext('2d');
+  var cropModal    = document.getElementById('crop-modal');
+  var CROP_SIZE    = 280;
+  var cropImg      = new Image();
+  var cropX = 0, cropY = 0, cropScale = 1;
+  var cropDragging = false, cropDragStartX, cropDragStartY, cropInitX, cropInitY;
+
+  function drawCrop() {
+    cropCtx.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
+    var cx = CROP_SIZE / 2, cy = CROP_SIZE / 2;
+
+    // Dimmed full image outside circle
+    cropCtx.save();
+    cropCtx.globalAlpha = 0.25;
+    cropCtx.translate(cx + cropX, cy + cropY);
+    cropCtx.scale(cropScale, cropScale);
+    cropCtx.drawImage(cropImg, -cropImg.width / 2, -cropImg.height / 2);
+    cropCtx.restore();
+
+    // Bright image clipped to circle
+    cropCtx.save();
+    cropCtx.beginPath();
+    cropCtx.arc(cx, cy, CROP_SIZE / 2, 0, Math.PI * 2);
+    cropCtx.clip();
+    cropCtx.translate(cx + cropX, cy + cropY);
+    cropCtx.scale(cropScale, cropScale);
+    cropCtx.drawImage(cropImg, -cropImg.width / 2, -cropImg.height / 2);
+    cropCtx.restore();
+
+    // Circle border
+    cropCtx.strokeStyle = '#F5BB00';
+    cropCtx.lineWidth = 2;
+    cropCtx.beginPath();
+    cropCtx.arc(cx, cy, CROP_SIZE / 2 - 1, 0, Math.PI * 2);
+    cropCtx.stroke();
+  }
+
+  function openCropModal(file) {
+    var url = URL.createObjectURL(file);
+    cropImg.onload = function () {
+      var minScale = Math.max(CROP_SIZE / cropImg.width, CROP_SIZE / cropImg.height);
+      cropScale = minScale;
+      cropX = 0; cropY = 0;
+      drawCrop();
+      cropModal.classList.add('visible');
+    };
+    cropImg.src = url;
+  }
+
+  cropCanvas.addEventListener('mousedown', function (e) {
+    cropDragging = true;
+    cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+    cropInitX = cropX; cropInitY = cropY;
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!cropDragging) return;
+    cropX = cropInitX + (e.clientX - cropDragStartX);
+    cropY = cropInitY + (e.clientY - cropDragStartY);
+    drawCrop();
+  });
+  window.addEventListener('mouseup', function () { cropDragging = false; });
+
+  cropCanvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? 0.9 : 1.1;
+    var minScale = Math.max(CROP_SIZE / cropImg.width, CROP_SIZE / cropImg.height);
+    cropScale = Math.max(minScale, cropScale * delta);
+    drawCrop();
+  }, { passive: false });
+
+  document.getElementById('btn-crop-cancel').addEventListener('click', function () {
+    cropModal.classList.remove('visible');
+  });
+
+  document.getElementById('btn-crop-apply').addEventListener('click', function () {
+    var out = document.createElement('canvas');
+    out.width = CROP_SIZE; out.height = CROP_SIZE;
+    var ctx = out.getContext('2d');
+    var cx = CROP_SIZE / 2, cy = CROP_SIZE / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, CROP_SIZE / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.translate(cx + cropX, cy + cropY);
+    ctx.scale(cropScale, cropScale);
+    ctx.drawImage(cropImg, -cropImg.width / 2, -cropImg.height / 2);
+
+    out.toBlob(function (blob) {
+      blob.arrayBuffer().then(function (buf) {
+        uploadedImageBytes = new Uint8Array(buf);
+        thumbPreview.src = URL.createObjectURL(blob);
+        thumbPreview.classList.add('visible');
+        thumbPlacehold.classList.add('hidden');
+        if (profileImageAsset) {
+          profileImageAsset.decode(uploadedImageBytes);
+          setStatus('Image updated', 'done');
+        } else {
+          initRive();
+        }
+        cropModal.classList.remove('visible');
+      });
+    }, 'image/png');
+  });
 
   // ── Rive init ──
   function initRive() {
@@ -372,11 +526,14 @@
       assetLoader: function (asset, bytes) {
         if (!asset) return false;
         var isImage = asset.isImage || asset.fileExtension === 'png' || asset.fileExtension === 'jpg' || asset.fileExtension === 'jpeg';
-        if (isImage && uploadedImageBytes && asset.name === 'profile copy') {
-          fetch(URL.createObjectURL(new Blob([uploadedImageBytes])))
-            .then(function(res) { return res.arrayBuffer(); })
-            .then(function(buf) { asset.decode(new Uint8Array(buf)); });
-          return true;
+        if (isImage && asset.name === 'profile copy') {
+          profileImageAsset = asset;
+          if (uploadedImageBytes) {
+            fetch(URL.createObjectURL(new Blob([uploadedImageBytes])))
+              .then(function(res) { return res.arrayBuffer(); })
+              .then(function(buf) { asset.decode(new Uint8Array(buf)); });
+            return true;
+          }
         }
         return false;
       },
@@ -457,19 +614,8 @@
   fileInput.addEventListener('change', function (e) {
     var file = e.target.files[0];
     if (!file) return;
-
-    thumbPreview.src = URL.createObjectURL(file);
-    thumbPreview.classList.add('visible');
-    thumbPlacehold.classList.add('hidden');
-
-    var reader = new FileReader();
-    reader.onload = function () {
-      uploadedImageBytes = new Uint8Array(reader.result);
-      setStatus('Image loaded (' + (file.size / 1024).toFixed(0) + ' KB). Reloading Rive...', '');
-
-      initRive();
-    };
-    reader.readAsArrayBuffer(file);
+    openCropModal(file);
+    fileInput.value = '';
   });
 
   // ── Play ──
@@ -484,13 +630,11 @@
     });
   });
 
-  // ── Apply button ──
+  // ── Apply button + live updates ──
   btnApply.addEventListener('click', function () { applyChanges(); });
 
   [inputUsername, inputMoney, inputCountry].forEach(function (el) {
-    el.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') applyChanges();
-    });
+    el.addEventListener('input', function () { applyChanges(); });
   });
 
   // ── Recording formats ──
