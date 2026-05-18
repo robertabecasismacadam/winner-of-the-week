@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Winner of the Week — Rive Preview</title>
+<style>
+  @font-face { font-family:"Yalla"; src:url("fonts/Yalla.ttf") format("truetype"); font-weight:400; }
+  @font-face { font-family:"Satoshi"; src:url("fonts/Satoshi-Medium.ttf") format("truetype"); font-weight:500; }
+  @font-face { font-family:"Satoshi"; src:url("fonts/Satoshi-Bold.ttf") format("truetype"); font-weight:700; }
+  @font-face { font-family:"Satoshi"; src:url("fonts/Satoshi-Black.ttf") format("truetype"); font-weight:900; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    background: #0f0f1a;
+    font-family: "Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  .layout {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    max-width: 660px;
+    width: 100%;
+  }
+
+  .canvas-wrapper {
+    flex-shrink: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    background: #1a1a2e;
+  }
+
+  canvas {
+    display: block;
+    width: 280px;
+    height: 498px;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 220px;
+    flex: 1;
+  }
+
+  h1 { font-size: 20px; font-weight: 900; color: #fff; }
+  .subtitle { font-size: 12px; color: #666; margin-top: 2px; }
+
+  .step-header {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #F5BB00;
+    margin-top: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #222;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+
+  .field label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+  }
+
+  .field input[type="text"] {
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid #2a2a3e;
+    background: #151525;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input[type="text"]:focus { border-color: #F5BB00; }
+
+  .image-upload {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    object-fit: cover;
+    background: #1a1a2e;
+    display: none;
+  }
+  .thumb.visible { display: block; }
+
+  .thumb-placeholder {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px dashed #333;
+    display: grid;
+    place-items: center;
+    color: #555;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .thumb-placeholder.hidden { display: none; }
+
+  .upload-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a2a3e;
+    background: #151525;
+    color: #ccc;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .upload-btn:hover { border-color: #F5BB00; color: #fff; }
+
+  .btn {
+    padding: 11px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .btn-apply {
+    background: #2a2a3e;
+    color: #F5BB00;
+  }
+  .btn-apply:hover { background: #3a3a4e; }
+
+  .btn-play {
+    background: #222;
+    color: #fff;
+    border: 1px solid #333;
+  }
+  .btn-play:hover { background: #333; }
+
+  .btn-render {
+    background: #F5BB00;
+    color: #000;
+  }
+  .btn-render:hover { background: #ffd960; }
+  .btn-render:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .download-section {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .download-section.visible {
+    display: flex;
+  }
+
+  .btn-download-webm {
+    background: #14AE91;
+    color: #fff;
+  }
+  .btn-download-webm:hover { background: #1bc5a5; }
+
+  .btn-download-mp4 {
+    background: #8577FF;
+    color: #fff;
+  }
+  .btn-download-mp4:hover { background: #9a8eff; }
+  .btn-download-mp4:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+  }
+
+  .status {
+    font-size: 12px;
+    color: #666;
+    min-height: 18px;
+    line-height: 1.4;
+  }
+  .status.recording { color: #FD605D; font-weight: 700; }
+  .status.done { color: #14AE91; }
+  .status.converting { color: #8577FF; }
+
+  .rec-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #FD605D;
+    margin-right: 5px;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  .debug {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #555;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .debug strong { color: #888; }
+  .debug .found { color: #14AE91; }
+  .debug .miss { color: #FD605D; }
+
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="canvas-wrapper">
+    <canvas id="rive-canvas" width="1080" height="1920"></canvas>
+  </div>
+
+  <div class="controls">
+    <div>
+      <h1>Winner of the Week</h1>
+      <p class="subtitle">Jackpot Express — Rive Preview</p>
+    </div>
+
+    <!-- STEP A: Edit Data -->
+    <div class="step-header">1 &mdash; Edit Data</div>
+
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="input-username" value="lucie_m" />
+    </div>
+    <div class="field">
+      <label>Amount of Money</label>
+      <input type="text" id="input-money" value="5.000" />
+    </div>
+    <div class="field">
+      <label>Place / Country</label>
+      <input type="text" id="input-country" value="Lyon, France" />
+    </div>
+    <div class="field">
+      <label>Profile Image</label>
+      <div class="image-upload">
+        <div class="thumb-placeholder" id="thumb-placeholder">+</div>
+        <img class="thumb" id="thumb-preview" alt="profile" />
+        <div>
+          <button class="upload-btn" id="btn-upload">Choose Image</button>
+          <input type="file" id="file-profile" accept="image/*" />
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-apply" id="btn-apply">Apply Changes</button>
+
+    <!-- STEP B: Preview -->
+    <div class="step-header">2 &mdash; Preview</div>
+    <button class="btn btn-play" id="btn-play">&#9654; Play Animation</button>
+
+    <!-- STEP C: Render -->
+    <div class="step-header">3 &mdash; Render</div>
+    <button class="btn btn-render" id="btn-render">Record 15s Video</button>
+
+    <!-- STEP D: Download -->
+    <div class="download-section" id="download-section">
+      <div class="step-header">4 &mdash; Download</div>
+      <button class="btn btn-download-webm" id="btn-dl-webm">Download .webm</button>
+      <button class="btn btn-download-mp4" id="btn-dl-mp4">Download .mp4</button>
+    </div>
+
+    <div class="status" id="status">Loading Rive...</div>
+
+    <div class="debug" id="debug">Waiting for Rive to load...</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/@rive-app/canvas@latest"></script>
+<script>
+(function () {
+  const canvas  = document.getElementById('rive-canvas');
+  const statusEl = document.getElementById('status');
+  const debugEl  = document.getElementById('debug');
+
+  const btnApply  = document.getElementById('btn-apply');
+  const btnPlay   = document.getElementById('btn-play');
+  const btnRender = document.getElementById('btn-render');
+  const btnDlWebm = document.getElementById('btn-dl-webm');
+  const btnDlMp4  = document.getElementById('btn-dl-mp4');
+  const dlSection = document.getElementById('download-section');
+
+  const btnUpload      = document.getElementById('btn-upload');
+  const fileInput      = document.getElementById('file-profile');
+  const thumbPreview   = document.getElementById('thumb-preview');
+  const thumbPlacehold = document.getElementById('thumb-placeholder');
+
+  const inputUsername = document.getElementById('input-username');
+  const inputMoney    = document.getElementById('input-money');
+  const inputCountry  = document.getElementById('input-country');
+
+  let riveInstance = null;
+  let currentSM = null;
+  let uploadedImageBytes = null;
+  let recordedBlob = null;
+  let imageAssetNames = [];
+
+  // ViewModel property handles
+  let vmProps = {};
+
+  function setStatus(text, cls) {
+    statusEl.className = 'status ' + (cls || '');
+    statusEl.innerHTML = text;
+  }
+
+  // ── Rive init ──
+  function initRive() {
+    if (riveInstance) {
+      riveInstance.cleanup();
+      riveInstance = null;
+    }
+    imageAssetNames = [];
+    vmProps = {};
+
+    riveInstance = new rive.Rive({
+      src: './jackpot.riv',
+      canvas: canvas,
+      autoplay: false,
+      artboard: 'Artboard',
+      stateMachines: 'State Machine 1',
+      autoBind: true,
+      useOffscreenRenderer: true,
+      layout: new rive.Layout({
+        fit: rive.Fit.Cover,
+        alignment: rive.Alignment.Center,
+      }),
+      assetLoader: function (asset, bytes) {
+        if (!asset) return false;
+
+        var isImage = asset.isImage || asset.fileExtension === 'png' || asset.fileExtension === 'jpg' || asset.fileExtension === 'jpeg';
+
+        if (isImage) {
+          imageAssetNames.push(asset.name);
+          console.log('[assetLoader] image:', asset.name);
+          if (uploadedImageBytes && asset.name === 'profile copy') {
+            fetch(URL.createObjectURL(new Blob([uploadedImageBytes]))).then(function (res) {
+              return res.arrayBuffer();
+            }).then(function (buf) {
+              asset.decode(new Uint8Array(buf));
+            });
+            return true;
+          }
+          return false;
+        }
+
+        return false;
+      },
+      onLoad: function () {
+        riveInstance.resizeDrawingSurfaceToCanvas();
+        window._riveInstance = riveInstance;
+        discoverViewModel();
+        setStatus('Ready', 'done');
+      },
+      onLoadError: function (e) {
+        setStatus('Load error — check console', 'recording');
+        console.error('Rive load error', e);
+      },
+    });
+  }
+
+  // ── ViewModel Discovery ──
+  function discoverViewModel() {
+    var smNames = riveInstance.stateMachineNames || [];
+    var animNames = riveInstance.animationNames || [];
+    currentSM = smNames[0] || 'State Machine 1';
+
+    var html = '<strong>State Machines:</strong> ' + (smNames.join(', ') || 'none') + '<br/>';
+    html += '<strong>Animations:</strong> ' + (animNames.join(', ') || 'none') + '<br/>';
+    html += '<strong>Image assets:</strong> ' + (imageAssetNames.length ? imageAssetNames.join(', ') : 'none') + '<br/><br/>';
+
+    // Explore ViewModels
+    var vmCount = riveInstance.viewModelCount || 0;
+    html += '<strong>ViewModels:</strong> ' + vmCount + '<br/>';
+
+    for (var i = 0; i < vmCount; i++) {
+      try {
+        var vm = riveInstance.viewModelByIndex(i);
+        html += '&nbsp;&nbsp;[' + i + '] name: "' + (vm.name || '?') + '"<br/>';
+        console.log('[VM ' + i + ']', vm.name, vm);
+      } catch (e) {
+        html += '&nbsp;&nbsp;[' + i + '] error: ' + e.message + '<br/>';
+      }
+    }
+
+    // Try to get default VM instance or by name "slotmachine"
+    var vmInstance = null;
+
+    try {
+      var vmDef = riveInstance.viewModelByName('SlotMachine');
+      if (vmDef) {
+        vmInstance = vmDef.defaultInstance();
+        html += '<br/><span class="found">&#10003; Found VM "slotmachine"</span><br/>';
+      }
+    } catch (e) {
+      console.log('VM by name failed:', e);
+    }
+
+    if (!vmInstance) {
+      try {
+        vmInstance = riveInstance.viewModelInstance;
+        if (vmInstance) {
+          html += '<br/><span class="found">&#10003; Using default VM instance</span><br/>';
+        }
+      } catch (e) {
+        console.log('Default VM instance failed:', e);
+      }
+    }
+
+    if (!vmInstance) {
+      try {
+        var defaultVM = riveInstance.defaultViewModel();
+        if (defaultVM) {
+          vmInstance = defaultVM.defaultInstance();
+          html += '<br/><span class="found">&#10003; Using defaultViewModel()</span><br/>';
+        }
+      } catch (e) {
+        console.log('defaultViewModel failed:', e);
+      }
+    }
+
+    if (vmInstance) {
+      html += '<strong>VM Properties:</strong><br/>';
+      var propNames = ['amountOfMoney', 'placeCountry', 'username',
+                       'AmountOfMoney', 'PlaceCountry', 'Username',
+                       'amount', 'place', 'user', 'name', 'money', 'country', 'city'];
+
+      for (var j = 0; j < propNames.length; j++) {
+        var pName = propNames[j];
+        try {
+          var stringProp = vmInstance.string(pName);
+          if (stringProp) {
+            vmProps[pName] = stringProp;
+            html += '<span class="found">&nbsp;&nbsp;&#10003; string "' + pName + '" = "' + stringProp.value + '"</span><br/>';
+          }
+        } catch (e) { /* not found */ }
+        try {
+          var numProp = vmInstance.number(pName);
+          if (numProp) {
+            vmProps[pName] = numProp;
+            html += '<span class="found">&nbsp;&nbsp;&#10003; number "' + pName + '" = ' + numProp.value + '</span><br/>';
+          }
+        } catch (e) { /* not found */ }
+      }
+
+      // Bind the VM instance to the artboard
+      try {
+        riveInstance.bindViewModelInstance(vmInstance);
+        html += '<br/><span class="found">&#10003; VM bound to artboard</span><br/>';
+      } catch (e) {
+        html += '<br/><span class="miss">&#10007; bindViewModelInstance failed: ' + e.message + '</span><br/>';
+      }
+
+      window._vmInstance = vmInstance;
+      window._vmProps = vmProps;
+    } else {
+      html += '<br/><span class="miss">&#10007; No ViewModel instance found</span><br/>';
+
+      // Fallback: try text runs
+      html += '<br/><strong>Trying text runs fallback...</strong><br/>';
+      var textRunCandidates = ['amountOfMoney', 'placeCountry', 'username', 'profileInfo',
+                                'amount', 'place', 'user', 'name', 'money', 'country'];
+      for (var k = 0; k < textRunCandidates.length; k++) {
+        try {
+          var val = riveInstance.getTextRunValue(textRunCandidates[k]);
+          if (val !== undefined && val !== null) {
+            html += '<span class="found">&nbsp;&nbsp;&#10003; textRun "' + textRunCandidates[k] + '" = "' + val + '"</span><br/>';
+          }
+        } catch (e) { /* not found */ }
+      }
+    }
+
+    debugEl.innerHTML = html;
+    console.log('[discover] vmProps:', vmProps);
+  }
+
+  // ── Apply values ──
+  function applyChanges() {
+    if (!riveInstance) return;
+
+    var applied = 0;
+    var mapping = {
+      username: inputUsername.value,
+      amountOfMoney: inputMoney.value,
+      placeCountry: inputCountry.value,
+    };
+
+    for (var key in mapping) {
+      var prop = vmProps[key];
+      if (prop && mapping[key]) {
+        try {
+          prop.value = mapping[key];
+          applied++;
+          console.log('[apply] set', key, '=', mapping[key]);
+        } catch (e) {
+          console.warn('[apply] failed', key, e);
+        }
+      }
+    }
+
+    // Also try text runs as fallback
+    for (var key2 in mapping) {
+      if (!vmProps[key2] && mapping[key2]) {
+        try {
+          riveInstance.setTextRunValue(key2, mapping[key2]);
+          applied++;
+        } catch (e) { /* not available */ }
+      }
+    }
+
+    setStatus(applied + ' value(s) applied', 'done');
+  }
+
+  // ── Image upload ──
+  btnUpload.addEventListener('click', function () { fileInput.click(); });
+
+  fileInput.addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    if (!file) return;
+
+    thumbPreview.src = URL.createObjectURL(file);
+    thumbPreview.classList.add('visible');
+    thumbPlacehold.classList.add('hidden');
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      uploadedImageBytes = new Uint8Array(reader.result);
+      setStatus('Image loaded (' + (file.size / 1024).toFixed(0) + ' KB). Reloading Rive...', '');
+
+      initRive();
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ── Play ──
+  btnPlay.addEventListener('click', function () {
+    if (!riveInstance) return;
+    riveInstance.reset();
+    requestAnimationFrame(function () {
+      discoverViewModel();
+      applyChanges();
+      riveInstance.play(currentSM);
+      setStatus('Playing: ' + currentSM, 'done');
+    });
+  });
+
+  // ── Apply button ──
+  btnApply.addEventListener('click', function () { applyChanges(); });
+
+  [inputUsername, inputMoney, inputCountry].forEach(function (el) {
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') applyChanges();
+    });
+  });
+
+  // ── Recording formats ──
+  var canMp4 = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1');
+  var canWebm = MediaRecorder.isTypeSupported('video/webm;codecs=vp9');
+  if (!canWebm) canWebm = MediaRecorder.isTypeSupported('video/webm');
+
+  // Show/hide download buttons based on what we can record
+  if (!canMp4) btnDlMp4.style.display = 'none';
+  if (!canWebm) btnDlWebm.style.display = 'none';
+
+  var recordedWebm = null;
+  var recordedMp4 = null;
+
+  // ── Render video ──
+  btnRender.addEventListener('click', function () {
+    if (!riveInstance) return;
+
+    var stream = canvas.captureStream(60);
+    var recorders = [];
+    var pending = 0;
+    recordedWebm = null;
+    recordedMp4 = null;
+
+    if (canWebm) {
+      var webmMime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+      var webmRec = new MediaRecorder(stream, { mimeType: webmMime, videoBitsPerSecond: 12000000 });
+      var webmChunks = [];
+      webmRec.ondataavailable = function (e) { if (e.data.size > 0) webmChunks.push(e.data); };
+      webmRec.onstop = function () {
+        recordedWebm = new Blob(webmChunks, { type: 'video/webm' });
+        pending--;
+        if (pending === 0) onAllDone();
+      };
+      recorders.push(webmRec);
+      pending++;
+    }
+
+    if (canMp4) {
+      var mp4Rec = new MediaRecorder(stream, { mimeType: 'video/mp4;codecs=avc1', videoBitsPerSecond: 12000000 });
+      var mp4Chunks = [];
+      mp4Rec.ondataavailable = function (e) { if (e.data.size > 0) mp4Chunks.push(e.data); };
+      mp4Rec.onstop = function () {
+        recordedMp4 = new Blob(mp4Chunks, { type: 'video/mp4' });
+        pending--;
+        if (pending === 0) onAllDone();
+      };
+      recorders.push(mp4Rec);
+      pending++;
+    }
+
+    function onAllDone() {
+      var parts = [];
+      if (recordedWebm) parts.push('WebM ' + (recordedWebm.size / 1024 / 1024).toFixed(1) + 'MB');
+      if (recordedMp4) parts.push('MP4 ' + (recordedMp4.size / 1024 / 1024).toFixed(1) + 'MB');
+      setStatus('Done! ' + parts.join(' + '), 'done');
+      btnRender.disabled = false;
+      dlSection.classList.add('visible');
+      if (recordedMp4) btnDlMp4.style.display = '';
+      if (recordedWebm) btnDlWebm.style.display = '';
+    }
+
+    riveInstance.reset();
+    requestAnimationFrame(function () {
+      discoverViewModel();
+      applyChanges();
+      riveInstance.play(currentSM);
+      recorders.forEach(function (r) { r.start(); });
+      btnRender.disabled = true;
+
+      var secondsLeft = 15;
+      setStatus('<span class="rec-dot"></span>Recording... ' + secondsLeft + 's', 'recording');
+
+      var countdown = setInterval(function () {
+        secondsLeft--;
+        if (secondsLeft > 0) {
+          setStatus('<span class="rec-dot"></span>Recording... ' + secondsLeft + 's', 'recording');
+        }
+      }, 1000);
+
+      setTimeout(function () {
+        clearInterval(countdown);
+        recorders.forEach(function (r) { r.stop(); });
+        setStatus('Processing...', '');
+      }, 15000);
+    });
+  });
+
+  // ── Download .webm ──
+  btnDlWebm.addEventListener('click', function () {
+    if (!recordedWebm) return;
+    var url = URL.createObjectURL(recordedWebm);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'winner_of_the_week_' + Date.now() + '.webm';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ── Download .mp4 ──
+  btnDlMp4.addEventListener('click', function () {
+    if (!recordedMp4) return;
+    var url = URL.createObjectURL(recordedMp4);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'winner_of_the_week_' + Date.now() + '.mp4';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ── Init ──
+  initRive();
+})();
+</script>
+</body>
+</html>
