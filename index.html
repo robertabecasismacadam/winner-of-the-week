@@ -76,6 +76,20 @@
     color: #999;
   }
 
+  .field input[type="number"] {
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid #2a2a3e;
+    background: #151525;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .field input[type="number"]:focus { border-color: #F5BB00; }
+
   .field input[type="text"] {
     padding: 9px 12px;
     border-radius: 8px;
@@ -282,7 +296,11 @@
 
     <!-- STEP C: Render -->
     <div class="step-header">3 &mdash; Render</div>
-    <button class="btn btn-render" id="btn-render">Record 15s Video</button>
+    <div class="field">
+      <label>Duration (seconds)</label>
+      <input type="number" id="input-duration" value="20" min="1" max="120" />
+    </div>
+    <button class="btn btn-render" id="btn-render">Record Video</button>
 
     <!-- STEP D: Download -->
     <div class="download-section" id="download-section">
@@ -297,7 +315,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/@rive-app/canvas@latest"></script>
+<script src="https://unpkg.com/@rive-app/canvas@2"></script>
 <script>
 (function () {
   const canvas  = document.getElementById('rive-canvas');
@@ -336,12 +354,10 @@
 
   // ── Rive init ──
   function initRive() {
-    if (riveInstance) {
-      riveInstance.cleanup();
-      riveInstance = null;
-    }
-    imageAssetNames = [];
+    if (riveInstance) { riveInstance.cleanup(); riveInstance = null; }
     vmProps = {};
+    currentSM = 'State Machine 1';
+    setStatus('Loading…', '');
 
     riveInstance = new rive.Rive({
       src: './jackpot.riv',
@@ -349,160 +365,54 @@
       autoplay: false,
       artboard: 'Artboard',
       stateMachines: 'State Machine 1',
-      autoBind: true,
-      useOffscreenRenderer: true,
       layout: new rive.Layout({
         fit: rive.Fit.Cover,
         alignment: rive.Alignment.Center,
       }),
       assetLoader: function (asset, bytes) {
         if (!asset) return false;
-
         var isImage = asset.isImage || asset.fileExtension === 'png' || asset.fileExtension === 'jpg' || asset.fileExtension === 'jpeg';
-
-        if (isImage) {
-          imageAssetNames.push(asset.name);
-          console.log('[assetLoader] image:', asset.name);
-          if (uploadedImageBytes && asset.name === 'profile copy') {
-            fetch(URL.createObjectURL(new Blob([uploadedImageBytes]))).then(function (res) {
-              return res.arrayBuffer();
-            }).then(function (buf) {
-              asset.decode(new Uint8Array(buf));
-            });
-            return true;
-          }
-          return false;
+        if (isImage && uploadedImageBytes && asset.name === 'profile copy') {
+          fetch(URL.createObjectURL(new Blob([uploadedImageBytes])))
+            .then(function(res) { return res.arrayBuffer(); })
+            .then(function(buf) { asset.decode(new Uint8Array(buf)); });
+          return true;
         }
-
         return false;
       },
       onLoad: function () {
         riveInstance.resizeDrawingSurfaceToCanvas();
-        window._riveInstance = riveInstance;
-        discoverViewModel();
-        setStatus('Ready', 'done');
+        bindViewModel();
+        riveInstance.play('State Machine 1');
+        setStatus('Playing', 'done');
       },
       onLoadError: function (e) {
-        setStatus('Load error — check console', 'recording');
-        console.error('Rive load error', e);
+        var msg = (e && (e.message || e.type || JSON.stringify(e))) || 'unknown';
+        setStatus('Load error: ' + msg, 'recording');
+        debugEl.innerHTML = msg;
       },
     });
   }
 
-  // ── ViewModel Discovery ──
-  function discoverViewModel() {
-    var smNames = riveInstance.stateMachineNames || [];
-    var animNames = riveInstance.animationNames || [];
-    currentSM = smNames[0] || 'State Machine 1';
-
-    var html = '<strong>State Machines:</strong> ' + (smNames.join(', ') || 'none') + '<br/>';
-    html += '<strong>Animations:</strong> ' + (animNames.join(', ') || 'none') + '<br/>';
-    html += '<strong>Image assets:</strong> ' + (imageAssetNames.length ? imageAssetNames.join(', ') : 'none') + '<br/><br/>';
-
-    // Explore ViewModels
-    var vmCount = riveInstance.viewModelCount || 0;
-    html += '<strong>ViewModels:</strong> ' + vmCount + '<br/>';
-
-    for (var i = 0; i < vmCount; i++) {
-      try {
-        var vm = riveInstance.viewModelByIndex(i);
-        html += '&nbsp;&nbsp;[' + i + '] name: "' + (vm.name || '?') + '"<br/>';
-        console.log('[VM ' + i + ']', vm.name, vm);
-      } catch (e) {
-        html += '&nbsp;&nbsp;[' + i + '] error: ' + e.message + '<br/>';
-      }
-    }
-
-    // Try to get default VM instance or by name "slotmachine"
-    var vmInstance = null;
-
+  // ── ViewModel bind ──
+  function bindViewModel() {
+    vmProps = {};
     try {
       var vmDef = riveInstance.viewModelByName('SlotMachine');
-      if (vmDef) {
-        vmInstance = vmDef.defaultInstance();
-        html += '<br/><span class="found">&#10003; Found VM "slotmachine"</span><br/>';
-      }
-    } catch (e) {
-      console.log('VM by name failed:', e);
-    }
-
-    if (!vmInstance) {
-      try {
-        vmInstance = riveInstance.viewModelInstance;
-        if (vmInstance) {
-          html += '<br/><span class="found">&#10003; Using default VM instance</span><br/>';
-        }
-      } catch (e) {
-        console.log('Default VM instance failed:', e);
-      }
-    }
-
-    if (!vmInstance) {
-      try {
-        var defaultVM = riveInstance.defaultViewModel();
-        if (defaultVM) {
-          vmInstance = defaultVM.defaultInstance();
-          html += '<br/><span class="found">&#10003; Using defaultViewModel()</span><br/>';
-        }
-      } catch (e) {
-        console.log('defaultViewModel failed:', e);
-      }
-    }
-
-    if (vmInstance) {
-      html += '<strong>VM Properties:</strong><br/>';
-      var propNames = ['amountOfMoney', 'placeCountry', 'username',
-                       'AmountOfMoney', 'PlaceCountry', 'Username',
-                       'amount', 'place', 'user', 'name', 'money', 'country', 'city'];
-
-      for (var j = 0; j < propNames.length; j++) {
-        var pName = propNames[j];
-        try {
-          var stringProp = vmInstance.string(pName);
-          if (stringProp) {
-            vmProps[pName] = stringProp;
-            html += '<span class="found">&nbsp;&nbsp;&#10003; string "' + pName + '" = "' + stringProp.value + '"</span><br/>';
-          }
-        } catch (e) { /* not found */ }
-        try {
-          var numProp = vmInstance.number(pName);
-          if (numProp) {
-            vmProps[pName] = numProp;
-            html += '<span class="found">&nbsp;&nbsp;&#10003; number "' + pName + '" = ' + numProp.value + '</span><br/>';
-          }
-        } catch (e) { /* not found */ }
-      }
-
-      // Bind the VM instance to the artboard
-      try {
-        riveInstance.bindViewModelInstance(vmInstance);
-        html += '<br/><span class="found">&#10003; VM bound to artboard</span><br/>';
-      } catch (e) {
-        html += '<br/><span class="miss">&#10007; bindViewModelInstance failed: ' + e.message + '</span><br/>';
-      }
-
+      var vmInstance = vmDef.defaultInstance();
+      riveInstance.bindViewModelInstance(vmInstance);
       window._vmInstance = vmInstance;
-      window._vmProps = vmProps;
-    } else {
-      html += '<br/><span class="miss">&#10007; No ViewModel instance found</span><br/>';
-
-      // Fallback: try text runs
-      html += '<br/><strong>Trying text runs fallback...</strong><br/>';
-      var textRunCandidates = ['amountOfMoney', 'placeCountry', 'username', 'profileInfo',
-                                'amount', 'place', 'user', 'name', 'money', 'country'];
-      for (var k = 0; k < textRunCandidates.length; k++) {
-        try {
-          var val = riveInstance.getTextRunValue(textRunCandidates[k]);
-          if (val !== undefined && val !== null) {
-            html += '<span class="found">&nbsp;&nbsp;&#10003; textRun "' + textRunCandidates[k] + '" = "' + val + '"</span><br/>';
-          }
-        } catch (e) { /* not found */ }
-      }
+      window._vmProps    = vmProps;
+      // cache the three text properties we write to
+      ['username', 'amountOfMoney', 'placeCountry'].forEach(function(name) {
+        try { var p = vmInstance.string(name); if (p) vmProps[name] = p; } catch(e) {}
+      });
+      debugEl.innerHTML = 'VM bound';
+    } catch(e) {
+      debugEl.innerHTML = 'VM bind failed: ' + e.message;
     }
-
-    debugEl.innerHTML = html;
-    console.log('[discover] vmProps:', vmProps);
   }
+
 
   // ── Apply values ──
   function applyChanges() {
@@ -567,10 +477,10 @@
     if (!riveInstance) return;
     riveInstance.reset();
     requestAnimationFrame(function () {
-      discoverViewModel();
+      bindViewModel();
       applyChanges();
-      riveInstance.play(currentSM);
-      setStatus('Playing: ' + currentSM, 'done');
+      riveInstance.play('State Machine 1');
+      setStatus('Playing', 'done');
     });
   });
 
@@ -645,13 +555,14 @@
 
     riveInstance.reset();
     requestAnimationFrame(function () {
-      discoverViewModel();
+      bindViewModel();
       applyChanges();
-      riveInstance.play(currentSM);
+      riveInstance.play('State Machine 1');
       recorders.forEach(function (r) { r.start(); });
       btnRender.disabled = true;
 
-      var secondsLeft = 15;
+      var duration = Math.max(1, parseInt(document.getElementById('input-duration').value) || 20);
+      var secondsLeft = duration;
       setStatus('<span class="rec-dot"></span>Recording... ' + secondsLeft + 's', 'recording');
 
       var countdown = setInterval(function () {
@@ -665,7 +576,7 @@
         clearInterval(countdown);
         recorders.forEach(function (r) { r.stop(); });
         setStatus('Processing...', '');
-      }, 15000);
+      }, duration * 1000);
     });
   });
 
