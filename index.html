@@ -288,7 +288,7 @@
 
 <div class="layout">
   <div class="canvas-wrapper">
-    <canvas id="rive-canvas" width="1080" height="1920"></canvas>
+    <canvas id="rive-canvas" width="540" height="960"></canvas>
   </div>
 
   <div class="controls">
@@ -697,6 +697,11 @@
       if (recordedWebm) btnDlWebm.style.display = '';
     }
 
+    // Scale up for recording
+    canvas.width = 1080;
+    canvas.height = 1920;
+    riveInstance.resizeDrawingSurfaceToCanvas();
+
     riveInstance.reset();
     requestAnimationFrame(function () {
       bindViewModel();
@@ -707,7 +712,7 @@
 
       var duration = Math.max(1, parseInt(document.getElementById('input-duration').value) || 20);
       var secondsLeft = duration;
-      setStatus('<span class="rec-dot"></span>Recording... ' + secondsLeft + 's', 'recording');
+      setStatus('<span class="rec-dot"></span>Recording ' + duration + 's @ 1080x1920... ' + secondsLeft + 's', 'recording');
 
       var countdown = setInterval(function () {
         secondsLeft--;
@@ -719,6 +724,10 @@
       setTimeout(function () {
         clearInterval(countdown);
         recorders.forEach(function (r) { r.stop(); });
+        // Scale back down for preview
+        canvas.width = 540;
+        canvas.height = 960;
+        riveInstance.resizeDrawingSurfaceToCanvas();
         setStatus('Processing...', '');
       }, duration * 1000);
     });
