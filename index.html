@@ -288,7 +288,7 @@
 
 <div class="layout">
   <div class="canvas-wrapper">
-    <canvas id="rive-canvas" width="540" height="960"></canvas>
+    <canvas id="rive-canvas" width="1080" height="1920"></canvas>
   </div>
 
   <div class="controls">
@@ -705,9 +705,9 @@
       btnRender.disabled = true;
 
       var duration = Math.max(1, parseInt(document.getElementById('input-duration').value) || 20);
-      setStatus('<span class="rec-dot"></span>Starting in 1s...', 'recording');
+      setStatus('<span class="rec-dot"></span>Starting in 3s...', 'recording');
 
-      // Wait 1 second for animation to start, then begin recording
+      // Wait 3 seconds for animation to warm up, then begin recording
       setTimeout(function () {
         recorders.forEach(function (r) { r.start(); });
         var secondsLeft = duration;
@@ -725,7 +725,7 @@
           recorders.forEach(function (r) { r.stop(); });
           setStatus('Processing...', '');
         }, duration * 1000);
-      }, 1000);
+      }, 3000);
     });
   });
 
