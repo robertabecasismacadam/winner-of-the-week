@@ -540,8 +540,12 @@
       onLoad: function () {
         riveInstance.resizeDrawingSurfaceToCanvas();
         bindViewModel();
+        // Start and immediately pause to show frame 1
         riveInstance.play('State Machine 1');
-        setStatus('Playing', 'done');
+        requestAnimationFrame(function () {
+          riveInstance.pause('State Machine 1');
+        });
+        setStatus('Ready — press Play to start', 'done');
       },
       onLoadError: function (e) {
         var msg = (e && (e.message || e.type || JSON.stringify(e))) || 'unknown';
