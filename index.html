@@ -478,15 +478,17 @@
   });
 
   document.getElementById('btn-crop-apply').addEventListener('click', function () {
+    var OUTPUT_SIZE = 800; // High-res output for Rive asset
+    var scaleFactor = OUTPUT_SIZE / CROP_SIZE;
     var out = document.createElement('canvas');
-    out.width = CROP_SIZE; out.height = CROP_SIZE;
+    out.width = OUTPUT_SIZE; out.height = OUTPUT_SIZE;
     var ctx = out.getContext('2d');
-    var cx = CROP_SIZE / 2, cy = CROP_SIZE / 2;
+    var cx = OUTPUT_SIZE / 2, cy = OUTPUT_SIZE / 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, CROP_SIZE / 2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, OUTPUT_SIZE / 2, 0, Math.PI * 2);
     ctx.clip();
-    ctx.translate(cx + cropX, cy + cropY);
-    ctx.scale(cropScale, cropScale);
+    ctx.translate(cx + cropX * scaleFactor, cy + cropY * scaleFactor);
+    ctx.scale(cropScale * scaleFactor, cropScale * scaleFactor);
     ctx.drawImage(cropImg, -cropImg.width / 2, -cropImg.height / 2);
 
     out.toBlob(function (blob) {
